@@ -18,6 +18,7 @@ use Magento\Framework\App\Request\InvalidRequestException;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\ResultInterface;
 use Magento\Framework\Controller\Result\RedirectFactory;
+use Magento\Framework\Event\ManagerInterface as EventManagerInterface;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Framework\Stdlib\Cookie\CookieMetadataFactory;
 use Magento\Framework\Stdlib\CookieManagerInterface;
@@ -47,6 +48,7 @@ class Callback implements HttpGetActionInterface, HttpPostActionInterface, CsrfA
     private const POST_PARAMS = ['code', 'state', 'user', 'error'];
 
     public function __construct(
+        private readonly EventManagerInterface $eventManager,
         private readonly HttpRequest $request,
         private readonly Pool $pool,
         private readonly FlowStore $flows,
@@ -132,6 +134,10 @@ class Callback implements HttpGetActionInterface, HttpPostActionInterface, CsrfA
         }
 
         $this->customerSession->setCustomerDataAsLoggedIn($customer);
+
+        // Other front ends (a headless storefront) follow this login from here.
+
+        $this->eventManager->dispatch('zero_sociallogin_login', ['customer' => $customer, 'flow' => $flow, 'profile' => $profile]);
         // As core's loginPost: the browser's private content cache belongs to the guest.
         if ($this->cookieManager->getCookie('mage-cache-sessid')) {
             $this->cookieManager->deleteCookie(
